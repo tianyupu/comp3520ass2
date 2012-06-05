@@ -1,3 +1,7 @@
+/*
+ * SID: 310182212
+ * Name: Tianyu Pu
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include "mab.h"

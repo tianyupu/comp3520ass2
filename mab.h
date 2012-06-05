@@ -1,3 +1,7 @@
+/*
+ * SID: 310182212
+ * Name: Tianyu Pu
+ */
 #include "types.h"
 
 struct mab *memchk(struct mab *m, int size);

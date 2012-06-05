@@ -1,3 +1,7 @@
+/*
+ * SID: 310182212
+ * Name: Tianyu Pu
+ */
 #include "types.h"
 
 struct rsrcb *rsrcchk(struct rsrcb *host, struct rsrcb *r);
