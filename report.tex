@@ -23,9 +23,24 @@
 \maketitle
 
 \section{Introduction}
+In this report we shall examine the Hypothetical Operating System Testbed
+(HOST) Dispatcher, starting wih a discussion of memory allocation
+algorithms as well as data structures for the memory and resources, the overall
+structure of the dispatcher, and concluding with a discussion and comparison
+of the dispatching schemes of HOST and real operating systems.
 \cite{ausmines}
 
 \section{Memory allocation}
+For the purposes of the assignment, the memory used by the processes is a
+contiguous block of memory assigned to that process for the entire lifetime of
+that process. The system only has 1024 megabytes (MB) of memory available for
+processes, and 64 MB must always be available for real-time processes -- this
+leaves 960 MB available for all active user jobs.
+
+In addition, there is no virtual memory support, nor is the system paged.
+
+Within these constraints, a number of variable memory partitioning algorithms
+are possible. The most commonly used are described below.
 
 \subsection{Overview of memory allocation algorithms}
 
