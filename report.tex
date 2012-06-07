@@ -1,6 +1,7 @@
 % SID: 310182212
 % Name: Tianyu Pu
 \documentclass[12pt]{article}
+\usepackage{emph}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsthm}
@@ -28,7 +29,7 @@ In this report we shall examine the Hypothetical Operating System Testbed
 algorithms as well as data structures for the memory and resources, the overall
 structure of the dispatcher, and concluding with a discussion and comparison
 of the dispatching schemes of HOST and real operating systems.
-\cite{ausmines}
+\cite{stallings:2002}
 
 \section{Memory allocation}
 For the purposes of the assignment, the memory used by the processes is a
@@ -43,6 +44,41 @@ Within these constraints, a number of variable memory partitioning algorithms
 are possible. The most commonly used are described below.
 
 \subsection{Overview of memory allocation algorithms}
+The need for memory management becomes apparent in a multiprogramming system
+such as the HOST dispatcher. This is because in addition to a ``system" part
+of memory, the ``user" part must also be divided to allow for multiple
+processes. In order to implement this, we examine some of the ways in which
+memory can be dynamically partitioned. Dynamic partitioning (i.e. allocating
+to a process exactly how much memory it needs) was considered over
+fixed partitioning (i.e. allocating a fixed block of memory to a process which
+may be more than it needs, effectively wasting the extra memory) because it
+more efficiently utilised the limited memory resources available in the HOST
+dispatcher.
+
+As stated earlier, dynamic partitioning involves allocating to a process
+exactly how much memory it requires. Over time, as more and more processes
+are created and more memory is allocated and recycled, we end up with many
+small holes in memory, a phenomenon known as \textit{external fragmentation}.
+It then follows that if we carefully choose which section of memory to allocate
+to a process we can reduce the number of these so-called fragments. With this
+context we will consider three different ways of placing these partitions,
+best-fit, first-fit, and next-fit -- these are called placement algorithms.
+In addition, the buddy system will also be described.
+
+\subsubsection{Placement algorithms -- best-fit, first-fit, next-fit}
+These three algorithms are all limited to selecting from the free blocks of
+memory that are equal or larger than the memory that the process about to be
+run needs.
+
+\textit{Best-fit} selects the free block that is as close to the required size
+as possible. \textit{First-fit} starts from the beginning of the block and
+selects the first free block that is large enough (regardless of how large or
+small the difference in size is), and \textit{next-fit} is like first-fit
+except that it scans from the place of the last allocation instead of at the
+beginning every time.
+
+\subsubsection{Buddy system}
+
 
 \subsection{Justification of final choice}
 
