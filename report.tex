@@ -17,7 +17,7 @@
   HOST Dispatcher Design Document}
 \author{Tianyu Pu\\
   310182212}
-\date{\today}
+\date{Semester 1, 2012}
 \fancyhead[R]{310182212}
 
 \begin{document}
@@ -29,7 +29,6 @@ In this report we shall examine the Hypothetical Operating System Testbed
 algorithms as well as data structures for the memory and resources, the overall
 structure of the dispatcher, and concluding with a discussion and comparison
 of the dispatching schemes of HOST and real operating systems.
-\cite{stallings:2002}
 
 \section{Memory allocation}
 For the purposes of the assignment, the memory used by the processes is a
@@ -78,9 +77,37 @@ except that it scans from the place of the last allocation instead of at the
 beginning every time.
 
 \subsubsection{Buddy system}
-
+The buddy system is an attempt to compromise between the fixed and dynamic
+partitioning schemes. Firstly, the size of the smallest possible memory block
+that can be allocated is determined. (This can depend on actual hardware
+limitations or on a balance between reducing memory wastage and excessive
+maintenance overhead). Then, the entire space available for allocation is
+treated as a single block of size $2^N$. If a request of size $s$ is less
+than $2^N$ and greater than $2^{N-1}$ (half of the block), then the entire
+block is allocated. If not, the block is split into two ``buddies" of size
+$2^{N-1}$ and the request is allocated to one of these buddies. Now, if 
+this request is less than the size of the block $2^{N-1}$
+but greater than $2^{N-2}$ (i.e., half of one of the buddy blocks), the process
+is allocated to one of the buddies. Otherwise, similar to the previous
+allocation, one of the buddies is split in half. This goes on until the
+process is allocated.
 
 \subsection{Justification of final choice}
+The final memory allocation system used in the HOST dispatcher is the first-fit
+placement algorithm. There are a number of reasons why this algorithm was
+chosen over the others discussed above.
+
+Of course, out of the three placement algorithm choices that are possible, the
+one that is best will depend on the size and swapping sequence of processes.
+However, \cite{stallings:2012} gathers and presents some general comments that
+have been made about these algorithms: first-fit tends to be the best and
+fastest; next-fit performs slightly worse as it tends to leave many fragments
+at the end of the block of free space, requiring more frequent merging of
+adjacent free blocks (\textit{compaction}) that incur a lot of overhead; and
+best-fit is usually the worst performer, as it leaves behind many blocks too
+small to satisfy subsequent allocation requests due to the fact that it tries
+to guarantee that the remaining free space after allocation is as small as
+possible (and hence requiring a great deal of memory compaction).
 
 \section{Data structures}
 
