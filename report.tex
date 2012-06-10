@@ -1,7 +1,6 @@
 % SID: 310182212
 % Name: Tianyu Pu
 \documentclass[12pt]{article}
-\usepackage{emph}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{amsthm}
@@ -9,16 +8,18 @@
 \usepackage{graphicx}
 \usepackage{natbib}
 \usepackage{hyperref}
-\usepackage{fullpage}
+\usepackage[a4paper,includehead,includefoot,margin=2.5cm]{geometry}
 \pagestyle{fancy}
-\rhead{Tianyu Pu 310182212}
 
 \title{COMP3520 Assignment 2\\
   HOST Dispatcher Design Document}
 \author{Tianyu Pu\\
   310182212}
 \date{Semester 1, 2012}
-\fancyhead[R]{310182212}
+\fancyhead[L]{}
+\fancyhead[L]{COMP3520 Operating Systems Internals}
+\fancyhead[R]{}
+\fancyhead[R]{Tianyu Pu 310182212}
 
 \begin{document}
 \maketitle
@@ -109,33 +110,240 @@ small to satisfy subsequent allocation requests due to the fact that it tries
 to guarantee that the remaining free space after allocation is as small as
 possible (and hence requiring a great deal of memory compaction).
 
+The buddy system has been found to be a reasonable compromise to try and
+overcome the weaknesses of the fixed as well as dynamic schemes of memory 
+alloation. However, for the purposes of this assignment, the first-fit memory
+allocation scheme has been selected for its performance and simplicity of
+implementation and maintenance.
+
 \section{Data structures}
 
-\subsection{Queuing}
+\subsection{Queuing and dispatching}
+The process queues are implemented using a singly-linked list data structure.
+There are separate queues for the input queue (when jobs are first read into
+the program), the user job queue, the real-time queue and the round robin
+feedback queues. In all queues, when a job is queued, it is added to the end of
+the linked list. When a job is dispatched from a particular queue, it is
+released from the head of the queue. This makes dispatching jobs very efficient
+(as only the head is examined), but enqueuing less efficient (as we need to
+traverse from the head to find the end of the list). The linked list
+implementation is also an intuitive representation of the underlying queue
+abstract data type, and is relatively easy to understand and maintain, without
+losing too much efficiency.
 
-\subsection{Dispatching}
+\subsection{Allocating resources}
+The memory of the HOST dispatcher is represented as a doubly-linked list, with
+each list element a block of memory (that may be allocated or free). Initially,
+the memory begins as a one-element linked list, and then is split and merged
+as processes require memory and then release it when they terminate. A doubly-
+linked list was used because the extra link makes it much easier to perform
+compaction of free memory -- to check if adjacent blocks are free, one only
+needs to check the previous and next links (if it were singly linked, to find
+the previous block another traversal through the list would have been required,
+decreasing the efficiency). Each process gets a block of memory allocated to
+them before they can run.
 
-\subsection{Allocating}
+Resources are represented using a C structure. Because their allocation is
+discrete rather than continuous (for example, you can only allocate 1 or 2
+printers, not half a printer, whereas you can allocate any amount of memory
+that fits within the available space of the operating system), a ``master"
+resource monitor keeps the counts of available resources (printers, scanners,
+modems and CD drives) during the execution of the HOST dispatcher. The 
+resources a process needs is stored when the process is read from input, but
+marked as unallocated. Just before the process is sent to a non-realtime job
+queue (since realtime jobs do not use resources), the process's resource
+requirements are checked against the available counts in the main resource
+monitor. This is a simple comparison of the four fields of the structure and is
+very efficient. All allocations and deallocations simply update the resource
+counts in the main resource monitor structures. This provides a central way of
+keeping track of resources counts while also being able to track the resources
+that each process needs.
 
 \section{Program structure}
 
 \subsection{Overview}
+The HOST dispatcher consists of several different sub-functions that work
+together to run the whole program. These can be broken down into the main
+program, and separate functions for processes, memory allocation and resource
+tracking.
 
-\subsection{\tt{hostd.c}}
+\subsection{Dispatcher}
+The function of the dispatcher is to retrieve the jobs and run them based on
+the status of the various queues. It also maintains the memory and the
+resources. It does this by calling functions contained in the other modules
+for process creation, termination, suspension, memory allocation and
+deallocation, as well as resource management. As a result, the dispatcher
+contains only the high-level control flow of the dispatcher -- the details of
+the management of processes, memory and resources are delegated to the other
+modules (described below).
 
-\subsection{\tt{pcb.c}}
+\subsection{Processes}
+Process management is implemented in the \texttt{pcb.c} file, which includes 
+the following functions:
+\begin{itemize}
+\item \texttt{struct pcb *startpcb(struct pcb *process)} takes a process block 
+and attempts to start the process. It prints the various characteristics of the
+process such as its process ID, priority, remaining CPU time, memory offset
+location and size, status and resources allocated. If the process failed to
+start (the call to \texttt{execvp()} or \texttt{fork()} failed), then NULL is 
+returned. Else, the process is started and returned.
+\item \texttt{struct pcb *terminatepcb(struct pcb *process)} takes a process
+block and uses \texttt{kill()} to send the interrupt signal to the process. It
+then waits for the process to terminate before returning.
+\item \texttt{struct pcb *suspendpcb(struct pcb *process)} takes a process and
+sends it the terminal stop signal (the catchable version of SIGSTOP) to suspend
+it. It then waits for the process to suspend before returning.
+\item \texttt{struct pcb *restartpcb(struct pcb *process)} takes a process and
+attempts to restart the process by sending it the SIGCONT signal, returning
+NULL if unsuccessful.
+\item \texttt{struct pcb *createnullpcb(void)} creates a new process control 
+block and returns it.
+\item \texttt{struct pcb *enqpcb(struct pcb **head, struct pcb *process)} takes
+the pointer to the head of the process queue as well as the desired process, 
+and enqueues the process by traversing through the linked list queue from 
+the head.
+\item \texttt{struct pcb *deqpcb(struct pcb **head)} takes the pointer to the 
+head of the job queue and simply returns the process at the head and updates
+the new head of the queue.
+\item \texttt{void printq(struct pcb **head)} is a helper function for printing
+out the contents of a queue, given a pointer to the head of that queue.
+\end{itemize}
 
-\subsection{\tt{mab.c}}
+\subsection{Memory}
+Memory management is implemented in the \texttt{mab.c} file, which includes
+the following functions:
+\begin{itemize}
+\item \texttt{struct mab *memchk(struct mab *m, int size)} takes a memory
+block and traverses the memory block list to find a block of at least
+\textit{size} large. If it finds the block, it returns it, otherwise it returns
+NULL.
+\item \texttt{struct mab *memalloc(struct mab *m, int size)} uses memchk() to
+find the available block (if any), and then calls memsplit() on that block.
+The behaviour of memsplit() will be described in more detail below.
+\item \texttt{struct mab *memfree(struct mab *m)} takes a memory block to free
+as an argument, then calls memerge() on that block.
+\item \texttt{struct mab *memmerge(struct mab *m)} takes a memory block and
+attempts to merge additional free blocks to its left. It takes the result of
+the left merge and performs a right merge, and then returns the result.
+\item \texttt{struct mab *mergeleft(struct mab *m)} takes a memory block and
+traverses to its left to find additional adjacent free blocks, and returns
+the resulting merged block.
+\item \texttt{struct mab *mergeright(struct mab *m)} takes a memory block and 
+merges to its right. Like mergeleft(), it also returns the resulting merged
+block.
+\item \texttt{struct mab *memsplit(struct mab *m, int size)} splits the memory
+block given if its size is greater than the desired size, and creates a new
+memory block. If the size of the block is just enough for the required process,
+then there is no splitting and the block is simply marked as being allocated.
+\item \texttt{void printmem(struct mab *head)} takes the head of the memory
+doubly-linked list and prints out the various blocks existing in memory. A
+helper function and used for debugging purposes only.
+\end{itemize}
 
-\subsection{\tt{rsrc.c}}
+\subsection{Resources}
+Resource management is very similar to the memory management described above.
+The functions are implemented in \texttt{rsrc.c}:
+\begin{itemize}
+\item \texttt{struct rsrcb *rsrcchk(struct rsrcb *host, struct rsrcb *r)}
+takes a resource monitor and a resource, and compares the fields of both. If
+there are enough of each resource in the monitor for the particular set of
+resources required, then return the resource (indicating true), else return
+NULL (indicating false).
+\item \texttt{struct rsrcb *rsrcalloc(struct rsrcb *host, struct rsrcb *r)}
+takes a resource monitor and a resources, and allocates the resource by
+substracting the resources counts from the main resource monitor.
+\item \texttt{void rsrcfree(struct rsrcb *host, struct rsrcb *r)} dellocates
+the resources by adding the counts back to the main resource monitor. Also
+frees the memory corresponding to the particular resource request.
+\end{itemize}
 
 \section{Dispatching schemes}
 
-\subsection{Dispatching scheme of the scheduler}
+\subsection{Dispatching scheme of HOST}
+The dispatching scheme of the HOST dispatcher consists of two types of 
+dispatchers:
+\begin{itemize}
+\item a first-come-first-served (FCFS) queue for real-time processes, and
+\item three round robin feedback dispatchers.
+\end{itemize}
+In this scheme, real-time processes are run until completion without
+interruption, even if there are multiple user jobs ready to be run. All
+real-time jobs in the queue are run until the queue is empty. If there
+are no real-time processes to run, then the job with the highest priority in
+the feedback queues is run for the length of a quantum (defined to be $1$ in
+the current implementation), before being suspended. After each quantum, the
+real-time queue is checked for any additional processes that have been added:
+if there are new processes, then those are run first, otherwise the highest
+priority non-realtime process is run for another quantum. Its priority is
+decreased (if possible) and placed on the appropriate round robin queue.
+
+Such a scheme allows high priority processes to be run before all other
+processes. This is particularly important for jobs that have a strict deadline
+and are critical to the system. Real-time processes also do not decrease in
+priority while they are running, ensuring that they pre-empt all other
+processes in the HOST dispatcher. If no real-time processes are currently
+running, then allowing the non-realtime jobs to run for only a small quantum
+ensures that other processes get executed without too much of a delay in
+running any real-time processes that arrive while another process is executing.
+
+One of the biggest shortcomings in this scheme is its scheduling of real-time
+processes. Because they are executed in the order that they arrive, and only
+one may be run at a time, there is no way for the scheduler to know if some
+real-time processes are more urgent than others, and some can potentially
+go over the deadline if they have to wait for a long real-time process before
+it to finish. Some ways have been come up with in order to solve this problem
+in current operating systems that are used today, and they will be discussed in
+the next section.
+
+In addition, as the number of non-realtime processes increases, the scheduler
+alternates between each one for one second. Once all of these processes have
+been decreased to the lowest priority, each process will run in order until
+they complete. This makes sense to ensure that each process gets an equal
+opportunity to run and to complete, however there is no way of distinguishing
+between processes that have run for a while which could be a problem if certain
+non-realtime jobs need to run more than others. The problem with round robin
+scheduling is its lack of throughput when too-small quantum sizes are used.
+There is also no opportunity for multiple processors and parallelisation.
 
 \subsection{Schemes used by popular operating systems}
+Here we discuss some of the more commonly used operating systems and how they
+schedule their real-time and non-realtime processes, with comparisons between
+them and the HOST dispatcher we have discussed above. The information about
+these systems have been based off the material in \cite{stallings:2012}.
 
-\subsection{Discussion}
+\subsubsection{Linux}
+The scheduler in Linux systems before version 2.4 consisted of a real-time
+and non-realtime scheduler. The real-time scheduler differed from the HOST
+dispatcher: it was made up two classes, a FCFS queue and a round-robin system.
+This is in contrast to the FCFS queue solely used in the HOST dispatcher. This
+allows the absolutely most urgent processes to be placed in the FCFS queue to
+complete (generally) without interruptions, while also handling other less
+pressing processes in the round-robin queues. This ensures that all real-time
+processes can be executed at a frequency suitable to the process.
+
+The non-realtime scheduling is also different from the HOST dispatcher --
+the priority of each process is dynamically computed during its execution as
+a function of its static priority (the priority it starts with, and is 
+specified by the user) and its execution behaviour. Generally, tasks that have
+spent a lot of time sleeping are given a higher priority, and the scheduler
+tends to favour I/O-bound tasks over processor-bound tasks. Different processes
+are also assigned different size timeslices (between 10-200ms). Higher-priority
+tasks are generally allocated longer timeslices.
+
+For memory allocation, Linux has two main aspects: virtual memory and kernel
+memory. Virtual memory in Linux is addressed using a three-level page table
+consisting of a page directory, page middle directory, and a page table. Pages
+are allocated using the buddy system, which enhances reading in and writing out
+pages to and from main memory. Pages in memory are replaced using the least
+frequently used policy, which relies on the assumption that the pages that are
+the oldest and least used are less likely to be used again (and hence are
+marked for replacement). The HOST dispatcher does not have any sort of
+memory replacement functionality -- once a process acquires a block of memory,
+it holds onto that memory until it finishes executing, even while it waits for
+other processes to execute before it can complete. For kernel memory, Linux
+uses a scheme called \textit{slab allocation} for small short-term chunks,
+which essentially is a set of linked lists for each chunk of memory. Chunks may
+be merged and moved in a similar way to the buddy algorithm.
 
 \section{Concluding remarks}
 
