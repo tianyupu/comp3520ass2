@@ -345,7 +345,42 @@ uses a scheme called \textit{slab allocation} for small short-term chunks,
 which essentially is a set of linked lists for each chunk of memory. Chunks may
 be merged and moved in a similar way to the buddy algorithm.
 
-\section{Concluding remarks}
+\subsubsection{Windows}
+The scheduler implemented in the Windows operating system is a pre-emptive one
+with a system of round-robin scheduling for certain levels as well as dynamic
+priority variation for other levels. Unlike the systems described so far,
+threads are the unit of scheduling rather than processes. 
+
+Similar to the HOST dispatcher, there are two types (or ``classes") of
+priorities -- real-time and variable (likeable to user jobs). Each class is
+further separated into 16 priority levels, with threads in each classes of 
+varying priority levels. As a result of the pre-emptive scheduler, real-time
+tasks are given preference over other threads, similar to HOST. In contrast,
+however, the real-time priority class runs threads of a certain priority level
+using a round-robin queue. This allows different levels of real-time tasks to
+be run, unlike the single FCFS queue we implemented for the HOST dispatcher.
+All real-time threads have a fixed priority for their lifetime. This is not
+the case for variable (or non-realtime) threads -- they begin with an initial
+priority value and this value may receive a temporary boost during its
+lifetime. It is worth noting, however, that variable priority class threads are
+never boosted into the priority levels of real-time threads.
+Similar to the real-time class, there is a queue for every priority
+level, however in this instance it is a FCFS queue. As the priority level of a
+thread in this class can change, it will also move to a different queue based
+on its most current priority level. Like the Linux scheduling system, this
+scheme favours interactive I/O-bound threads over processor-bound ones.
+
+Windows uses virtual memory paging and a manager controls how the memory is
+allocated and the way paging is carried out. On 32-bit systems, the available
+user address space is almost 2GB, which is divided into pages of a fixed size.
+When a process is created, it can make use of all of this space. When it is
+first activated, data structures are assigned to it which managed its set of
+working memory. The set consists of regions that are available (not currently
+used by the process), reserved (addresses set aside for a process which cannot
+be allocated for another purpose), or committed (addresses initialised for the
+process's use). As sets of active processes grow, Windows recovers memory for
+the system by removing pages that are less recently used out of the working
+memory sets.
 
 \bibliographystyle{plainnat}
 \bibliography{report}

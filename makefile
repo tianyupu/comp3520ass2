@@ -14,10 +14,6 @@ REPORT = report
 all:
 	$(CC) -c $(NONMAIN_SRC) $(CFLAGS)
 	$(CC) -o $(BINARY) $(MAIN_SRC) *.o $(CFLAGS)
-	pdflatex $(REPORT)
-	bibtex $(REPORT)
-	pdflatex $(REPORT)
-	pdflatex $(REPORT)
 
 $(REPORT):
 	pdflatex $(REPORT)

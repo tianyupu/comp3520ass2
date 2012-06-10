@@ -15,6 +15,7 @@ struct mab *memchk(struct mab *m, int size) {
   struct mab *curr = m;
   while (curr) {
     if (size <= curr->size && curr->allocated == FALSE) {
+      // if it's big enough and it's free
       return curr;
     }
     curr = curr->next;
@@ -25,10 +26,10 @@ struct mab *memchk(struct mab *m, int size) {
 struct mab *memalloc(struct mab *m, int size) {
   // find the first available block
   struct mab *availblock = memchk(m, size);
-  if (availblock == NULL) {
+  if (availblock == NULL) { // no block was available
     return NULL;
   }
-  return memsplit(availblock, size);
+  return memsplit(availblock, size); // split the block with the required size
 }
 
 struct mab *memfree(struct mab *m) {
@@ -36,7 +37,7 @@ struct mab *memfree(struct mab *m) {
     return NULL;
   }
   m->allocated = FALSE; // mark as unallocated
-  return memmerge(m);
+  return memmerge(m); // merge free memory on either side of this block
 }
 
 struct mab *memmerge(struct mab *m) {
@@ -47,6 +48,10 @@ struct mab *memmerge(struct mab *m) {
 }
 
 struct mab *mergeleft(struct mab *m) {
+  // The idea is that we start from the given block and we traverse
+  // the linked list to the left until we either hit the front of the list
+  // or we've hit a block that's not free. Then we merge from that block
+  // to our current block to make one contiguous free block, and return it.
   if (m == NULL) {
     return NULL;
   }
@@ -61,7 +66,7 @@ struct mab *mergeleft(struct mab *m) {
     totalsize = totalsize + curr->size;
     prev = curr;
     curr = curr->prev;
-    if (prev->prev == NULL) {
+    if (prev->prev == NULL) { // if we've hit the head
       prev->size = totalsize;
       prev->allocated = FALSE;
       prev->next = rtblock;
@@ -88,7 +93,6 @@ struct mab *mergeright(struct mab *m) {
   }
   struct mab *curr = m->next;
   struct mab *prev;
-  //struct mab *ltblock = m->prev;
   int totalsize = m->size;
   while (curr) {
     if (curr->allocated) {
